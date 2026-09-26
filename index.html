@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VIP Access Terminal</title>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+  <style>
+    :root {
+      --theme-color: #00f2fe;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', 'Rajdhani', sans-serif; user-select: none; }
+    body { 
+      background: #030408; 
+      color: #fff; 
+      display: flex; 
+      justify-content: center; 
+      align-items: center; 
+      min-height: 100vh; 
+      overflow: hidden; 
+      position: relative; 
+    }
+    #bg-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+
+    /* ================= ১০০% ফিক্সড সেন্ট্রাল পপআপ সিস্টেম ================= */
+    .popup-modal-overlay {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      background: rgba(3, 4, 8, 0.92) !important;
+      backdrop-filter: blur(25px) !important;
+      -webkit-backdrop-filter: blur(25px) !important;
+      display: none;
+      justify-content: center !important;
+      align-items: center !important;
+      z-index: 999999 !important; /* লগইন কার্ডের চেয়ে অনেক উপরে */
+    }
+
+    .popup-box {
+      width: 86%;
+      max-width: 320px;
+      background: rgba(13, 19, 34, 0.85);
+      border: 1.5px solid var(--theme-color);
+      box-shadow: 0 0 45px rgba(0, 0, 0, 0.95), inset 0 0 15px var(--theme-color);
+      border-radius: 20px;
+      padding: 25px 20px;
+      text-align: center;
+      animation: modalPopIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    @keyframes modalPopIn {
+      from { transform: scale(0.8); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .modal-title { 
+      font-size: 17px; 
+      font-weight: 800; 
+      color: var(--theme-color); 
+      margin-bottom: 12px; 
+      letter-spacing: 1.5px;
+      text-shadow: 0 0 10px var(--theme-color);
+    }
+    .modal-desc { 
+      font-size: 13.5px; 
+      color: #cfddec; 
+      margin-bottom: 22px; 
+      line-height: 1.6; 
+      word-break: break-word;
+    }
+    .modal-btn {
+      width: 100%; 
+      padding: 12px 0; 
+      background: var(--theme-color); 
+      color: #030408;
+      border: none; 
+      border-radius: 10px; 
+      font-weight: 800; 
+      cursor: pointer; 
+      box-shadow: 0 0 20px var(--theme-color); 
+      font-size: 13.5px;
+      letter-spacing: 1px;
+      transition: 0.2s;
+    }
+    .modal-btn:active { transform: scale(0.96); }
+
+    /* ================= ১০০% ট্রান্সপারেন্ট আল্ট্রা গ্লাস কার্ড ================= */
+    .login-card {
+      position: relative;
+      z-index: 2;
+      width: 86%;
+      max-width: 325px;
+      padding: 26px 20px;
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      border-radius: 20px;
+      border: 1.5px solid var(--theme-color);
+      box-shadow: 0 0 35px rgba(0, 0, 0, 0.9), inset 0 0 15px var(--theme-color);
+      text-align: center;
+      transition: all 0.4s ease;
+    }
+
+    .shake-error {
+      animation: brutalShake 0.38s cubic-bezier(.36,.07,.19,.97) both;
+      border-color: #ff003b !important;
+      box-shadow: 0 0 40px rgba(255, 0, 59, 0.8) !important;
+    }
+    @keyframes brutalShake {
+      10%, 90% { transform: translate3d(-5px, 0, 0) rotate(-1.5deg); }
+      20%, 80% { transform: translate3d(6px, 0, 0) rotate(1.5deg); }
+      30%, 50%, 70% { transform: translate3d(-8px, 0, 0) rotate(-2deg); }
+      40%, 60% { transform: translate3d(8px, 0, 0) rotate(2deg); }
+    }
+
+    .badge {
+      display: inline-block; padding: 4px 12px; font-size: 9.5px; font-weight: 800;
+      letter-spacing: 2.5px; text-transform: uppercase; background: transparent;
+      color: var(--theme-color); border-radius: 20px; border: 1px solid var(--theme-color);
+      margin-bottom: 12px; text-shadow: 0 0 8px var(--theme-color);
+    }
+    h2 { font-size: 20px; font-weight: 800; letter-spacing: 2px; margin-bottom: 18px; color: #fff; text-shadow: 0 0 12px var(--theme-color); }
+
+    .input-box {
+      width: 100%; padding: 12px 14px; background: rgba(0, 0, 0, 0.45);
+      border: 1.2px solid rgba(255, 255, 255, 0.15); border-radius: 10px;
+      color: #fff; font-size: 14px; font-weight: 600; letter-spacing: 1.5px;
+      text-align: center; outline: none; margin-bottom: 16px; transition: 0.25s;
+    }
+    .input-box:focus { border-color: var(--theme-color); box-shadow: 0 0 14px var(--theme-color); }
+
+    .btn-login {
+      width: 100%; padding: 13px 0; background: transparent; border: 1.5px solid var(--theme-color);
+      border-radius: 10px; color: var(--theme-color); font-size: 13.5px; font-weight: 800;
+      letter-spacing: 2px; cursor: pointer; box-shadow: 0 0 15px rgba(0, 0, 0, 0.6);
+      transition: 0.3s; text-shadow: 0 0 6px var(--theme-color);
+    }
+    .btn-login:hover { background: var(--theme-color); color: #030408; box-shadow: 0 0 25px var(--theme-color); }
+    .btn-login:active { transform: scale(0.96); }
+
+    #msg { margin-top: 14px; font-size: 11.5px; font-weight: 700; min-height: 16px; }
+    .err { color: #ff003b; text-shadow: 0 0 8px rgba(255, 0, 59, 0.6); }
+    .suc { color: var(--theme-color); text-shadow: 0 0 8px var(--theme-color); }
+
+    .details-box {
+      display: none; text-align: left; background: rgba(0, 0, 0, 0.45);
+      border: 1px solid var(--theme-color); border-radius: 12px;
+      padding: 15px; margin-top: 15px; font-size: 12px;
+    }
+    .details-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+    .details-label { color: #8fa0bd; font-weight: 600; }
+    .details-val { color: var(--theme-color); font-weight: bold; }
+    .countdown-timer {
+      text-align: center; margin-top: 12px; padding: 8px; border-radius: 8px;
+      background: rgba(0, 0, 0, 0.35); border: 1px dashed var(--theme-color);
+      color: var(--theme-color); font-weight: 800; font-size: 12px; letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- থিম ম্যাচড সেন্ট্রাল নোটিফিকেশন পপআপ (সরাসরি স্ক্রিনের মাঝে) -->
+  <div class="popup-modal-overlay" id="noticeModal">
+    <div class="popup-box">
+      <div class="modal-title">📢 ANNOUNCEMENT</div>
+      <div class="modal-desc" id="popupNoticeText">Important server announcement</div>
+      <button class="modal-btn" onclick="dismissNotice()">DISMISS</button>
+    </div>
+  </div>
+
+  <!-- থিম ম্যাচড সেন্ট্রাল ফোর্সফুল আপডেট ওভারলে (স্ক্রিনের মাঝে লক থাকবে) -->
+  <div class="popup-modal-overlay" id="updateModal">
+    <div class="popup-box" style="border-color: #ff003b; box-shadow: 0 0 45px rgba(255, 0, 59, 0.4), inset 0 0 15px #ff003b;">
+      <div class="modal-title" style="color: #ff003b; text-shadow: 0 0 10px #ff003b;">🚀 UPDATE REQUIRED</div>
+      <div class="modal-desc" id="popupUpdateText">A mandatory update is available. You must update to continue using the application.</div>
+      <button class="modal-btn" style="background: #ff003b; color: #fff; box-shadow: 0 0 20px #ff003b;" onclick="redirectDownload()">UPDATE NOW</button>
+    </div>
+  </div>
+
+  <canvas id="bg-canvas"></canvas>
+
+  <div class="login-card" id="card">
+    <div class="badge" id="cardBadge">SECURE ACCESS</div>
+    <h2 id="cardTitle">VIP ACCESS</h2>
+
+    <div id="loginFormArea">
+      <input type="text" id="licenseKey" class="input-box" placeholder="XXXX-XXXX-XXXX" autocomplete="off" />
+      <button class="btn-login" id="loginBtn" onclick="verifyFast()">AUTHENTICATE</button>
+    </div>
+
+    <!-- ডিটেইলস ও লাইভ কাউন্টডাউন (Admin ফিল্ড সরানো হয়েছে) -->
+    <div class="details-box" id="detailsBox">
+      <div class="details-row"><span class="details-label">Key:</span><span class="details-val" id="dKey">-</span></div>
+      <div class="details-row"><span class="details-label">License Mode:</span><span class="details-val" id="dDevices">-</span></div>
+      <div class="details-row"><span class="details-label">HWID:</span><span class="details-val" id="dHwid" style="font-size:10px;">-</span></div>
+      <div class="countdown-timer" id="dCountdown">CALCULATING TIME...</div>
+    </div>
+
+    <div id="msg"></div>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAOnukvUIXpnsBqxg6p__73SH_j9z6_XwM",
+      authDomain: "trial-3d140.firebaseapp.com",
+      databaseURL: "https://trial-3d140-default-rtdb.firebaseio.com",
+      projectId: "trial-3d140",
+      storageBucket: "trial-3d140.firebasestorage.app",
+      messagingSenderId: "849558578206",
+      appId: "1:849558578206:android:9bc880cc645505a2afba0f"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let localKeys = {};
+    let isKeysLoaded = false;
+    let downloadTargetUrl = "";
+    let isUpdateBlocked = false; // আপডেট আসলেই সব লক হবে
+
+    // অ্যান্ড্রয়েড অ্যাপের বর্তমান ভার্সন কোড ধরা
+    function getAppVersion() {
+      try {
+        if (typeof Android !== "undefined" && Android.getAppVersionCode) {
+          const v = parseInt(Android.getAppVersionCode());
+          return isNaN(v) ? 1 : v;
+        }
+      } catch (e) {}
+      return 1; // ডিফল্ট ১
+    }
+
+    db.ref("Keys").on("value", snap => {
+      localKeys = snap.exists() ? snap.val() : {};
+      isKeysLoaded = true;
+      if (!isUpdateBlocked) checkSavedKey();
+    });
+
+    // ১. সেন্ট্রাল নোটিফিকেশন লিসেনার (স্ক্রিনের মাঝে পপআপ)
+    db.ref("Notifications/mainPanel").on("value", snap => {
+      const modal = document.getElementById("noticeModal");
+      const txt = document.getElementById("popupNoticeText");
+      if (snap.exists() && snap.val() && snap.val().trim() !== "") {
+        const msg = snap.val().trim();
+        const dismissed = localStorage.getItem("dismissed_notice");
+        // নতুন নোটিশ হলে সরাসরি ডিসপ্লে হবে
+        if (dismissed !== msg) {
+          txt.innerText = msg;
+          modal.style.display = "flex";
+        }
+      } else {
+        modal.style.display = "none";
+      }
+    });
+
+    function dismissNotice() {
+      const txt = document.getElementById("popupNoticeText").innerText;
+      localStorage.setItem("dismissed_notice", txt);
+      document.getElementById("noticeModal").style.display = "none";
+    }
+
+    // ২. ফোর্সফুল আপডেট চেকার (স্ক্রিনের মাঝে ফুল লক)
+    db.ref("Settings/appUpdate").on("value", snap => {
+      const modal = document.getElementById("updateModal");
+      if (snap.exists()) {
+        const data = snap.val();
+        const latestVer = parseInt(data.latestVersion) || 1;
+        const currentVer = getAppVersion();
+
+        if (latestVer > currentVer) {
+          isUpdateBlocked = true;
+          downloadTargetUrl = data.downloadUrl || "";
+          document.getElementById("popupUpdateText").innerText = data.updateMessage || "A critical update is required. Please update now to continue using the app!";
+          modal.style.display = "flex"; // স্ক্রিনের মাঝে পপআপ লক
+        } else {
+          isUpdateBlocked = false;
+          modal.style.display = "none";
+        }
+      }
+    });
+
+    function redirectDownload() {
+      if (downloadTargetUrl) {
+        if (typeof Android !== "undefined" && Android.openBrowser) {
+          Android.openBrowser(downloadTargetUrl);
+        } else {
+          window.location.href = downloadTargetUrl;
+        }
+      }
+    }
+
+    // ব্যাকগ্রাউন্ড থিম ও পার্টিকেল
+    const canvas = document.getElementById('bg-canvas');
+    const ctx = canvas.getContext('2d');
+    let items = [];
+    let fx = { mode: "bg_1", color: "#00f2fe", count: 65, speed: 1.0 };
+
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    window.addEventListener('resize', resize);
+    resize();
+
+    db.ref("Settings/particles").on("value", snap => {
+      if (snap.exists()) {
+        fx = Object.assign(fx, snap.val());
+        document.documentElement.style.setProperty('--theme-color', fx.color || "#00f2fe");
+        buildFx();
+      }
+    });
+
+    function buildFx() {
+      items = [];
+      for (let i = 0; i < (fx.count || 65); i++) {
+        items.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          radius: Math.random() * 2.5 + 1,
+          speedX: (Math.random() - 0.5) * (fx.speed || 1),
+          speedY: (Math.random() - 0.5) * (fx.speed || 1),
+          char: String.fromCharCode(0x30A0 + Math.random() * 96)
+        });
+      }
+    }
+    buildFx();
+
+    function renderEngine() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = fx.color || "#00f2fe";
+      ctx.strokeStyle = fx.color || "#00f2fe";
+
+      const bgNum = parseInt((fx.mode || "bg_1").replace("bg_", "")) || 1;
+      if (bgNum <= 20) {
+        ctx.font = "14px monospace";
+        items.forEach(p => {
+          ctx.fillText(p.char, p.x, p.y);
+          p.y += (fx.speed * 2.5);
+          if (p.y > canvas.height) { p.y = 0; p.x = Math.random() * canvas.width; }
+        });
+      } else {
+        for (let i = 0; i < items.length; i++) {
+          let p = items[i];
+          p.x += p.speedX; p.y += p.speedY;
+          if (p.x < 0 || p.x > canvas.width) p.speedX *= -1;
+          if (p.y < 0 || p.y > canvas.height) p.speedY *= -1;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          ctx.fill();
+
+          for (let j = i + 1; j < items.length; j++) {
+            let p2 = items[j];
+            let d = Math.hypot(p.x - p2.x, p.y - p2.y);
+            if (d < 85) {
+              ctx.globalAlpha = 1 - (d / 85);
+              ctx.beginPath();
+              ctx.moveTo(p.x, p.y);
+              ctx.lineTo(p2.x, p2.y);
+              ctx.stroke();
+              ctx.globalAlpha = 1;
+            }
+          }
+        }
+      }
+      requestAnimationFrame(renderEngine);
+    }
+    renderEngine();
+
+    function getDeviceId() { 
+      return (typeof Android !== "undefined" && Android.getDeviceId) ? Android.getDeviceId() : "WEB_" + window.navigator.userAgent.slice(0, 8); 
+    }
+    function getDeviceModel() { 
+      return (typeof Android !== "undefined" && Android.getDeviceModel) ? Android.getDeviceModel() : "Android Device"; 
+    }
+
+    function triggerFail(txt) {
+      const card = document.getElementById("card");
+      const msg = document.getElementById("msg");
+      msg.className = "err"; msg.innerText = txt;
+      card.classList.remove("shake-error");
+      void card.offsetWidth;
+      card.classList.add("shake-error");
+      setTimeout(() => card.classList.remove("shake-error"), 380);
+    }
+
+    let timerInterval = null;
+    function startLiveCountdown(expiryTime, isUnlimited) {
+      const display = document.getElementById("dCountdown");
+      if (timerInterval) clearInterval(timerInterval);
+
+      if (isUnlimited) {
+        display.innerText = "EXPIRATION: LIFETIME UNLIMITED";
+        return;
+      }
+
+      function update() {
+        const now = Date.now();
+        const diff = expiryTime - now;
+
+        if (diff <= 0) {
+          display.innerText = "KEY HAS EXPIRED!";
+          display.style.color = "#ff003b";
+          clearInterval(timerInterval);
+          localStorage.removeItem("savedVipKey");
+          return;
+        }
+
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+        const minutes = Math.floor((diff / 1000 / 60) % 60);
+        const seconds = Math.floor((diff / 1000) % 60);
+
+        display.innerText = `EXPIRES IN: ${days}d ${hours}h ${minutes}m ${seconds}s`;
+      }
+      update();
+      timerInterval = setInterval(update, 1000);
+    }
+
+    let autoLoginDone = false;
+    function checkSavedKey() {
+      if (autoLoginDone || !isKeysLoaded || isUpdateBlocked) return;
+      const savedKey = localStorage.getItem("savedVipKey");
+      if (savedKey && localKeys[savedKey]) {
+        document.getElementById("licenseKey").value = savedKey;
+        autoLoginDone = true;
+        verifyFast(true);
+      }
+    }
+
+    function verifyFast(isAuto = false) {
+      if (isUpdateBlocked) {
+        return triggerFail("UPDATE REQUIRED TO LOGIN!");
+      }
+
+      const key = document.getElementById("licenseKey").value.trim();
+      const msg = document.getElementById("msg");
+      if (!key) return triggerFail("ACCESS DENIED: KEY MISSING");
+
+      const data = localKeys[key];
+      if (!data) {
+        localStorage.removeItem("savedVipKey");
+        return triggerFail("INVALID KEY: REJECTED");
+      }
+      if (data.status === "banned") {
+        localStorage.removeItem("savedVipKey");
+        return triggerFail("FATAL: ACCESS BANNED");
+      }
+      if (data.status === "frozen") {
+        return triggerFail("WARNING: KEY IS FROZEN");
+      }
+
+      const devId = getDeviceId();
+      const devModel = getDeviceModel();
+      const now = Date.now();
+
+      if (!data.isUnlimited) {
+        if (data.registeredDeviceId && data.registeredDeviceId !== "" && data.registeredDeviceId !== devId) {
+          localStorage.removeItem("savedVipKey");
+          return triggerFail("HWID LOCK: OTHER DEVICE DETECTED");
+        }
+        if (data.registeredDeviceId && data.expiryTime && now > data.expiryTime) {
+          localStorage.removeItem("savedVipKey");
+          return triggerFail("SESSION EXPIRED: KEY EXPIRED");
+        }
+      }
+
+      localStorage.setItem("savedVipKey", key);
+
+      document.getElementById("dKey").innerText = key;
+      document.getElementById("dDevices").innerText = data.isUnlimited ? "Unlimited Devices" : "Single Device Only";
+      document.getElementById("dHwid").innerText = devId;
+
+      document.getElementById("detailsBox").style.display = "block";
+      document.getElementById("loginFormArea").style.display = "none";
+
+      msg.className = "suc";
+      msg.innerText = isAuto ? "WELCOME BACK! LAUNCHING..." : "ACCESS GRANTED! REDIRECTING...";
+
+      let finalExpiry = data.expiryTime || 0;
+      if (!data.isUnlimited && (!data.registeredDeviceId || data.registeredDeviceId === "")) {
+        let mult = 60000;
+        if (data.durationType === "days") mult *= 1440;
+        else if (data.durationType === "months") mult *= 1440 * 30;
+        else if (data.durationType === "years") mult *= 1440 * 365;
+        finalExpiry = now + ((parseInt(data.durationValue) || 1) * mult);
+
+        db.ref("Keys/" + key).update({
+          registeredDeviceId: devId,
+          deviceModel: devModel,
+          firstLoginTime: now,
+          expiryTime: finalExpiry
+        });
+      }
+
+      startLiveCountdown(finalExpiry, data.isUnlimited);
+
+      setTimeout(() => {
+        if (typeof Android !== "undefined" && Android.onLoginSuccess) {
+          Android.onLoginSuccess();
+        }
+      }, isAuto ? 800 : 1400);
+    }
+  </script>
+</body>
+</html>
